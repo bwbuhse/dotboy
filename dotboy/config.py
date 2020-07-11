@@ -10,5 +10,6 @@ class Config:
     ''' Class for holding information about dotman's configuration '''
 
     repo_path: Path
+    repo_url: str
     path_infos: List[PathInfo]
 
