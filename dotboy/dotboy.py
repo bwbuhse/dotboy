@@ -48,10 +48,14 @@ def load_config() -> Config:
         paths.append(PathInfo(path_pair, files_to_copy, dirs_to_copy))
 
     repo_path = Path.home() / '.dotboy'
-    if config_json['repo_path']:
+    if 'repo_path' in config_json.keys():
         repo_path = Path.expanduser(Path(config_json['repo_path']))
 
-    return Config(repo_path, paths)
+    repo_url = ''
+    if 'repo_url' in config_json.keys():
+        repo_url = config_json['repo_url']
+
+    return Config(repo_path, repo_url, paths)
 
 
 def pull(origin: git.Remote):
@@ -87,14 +91,37 @@ def save(config: Config, message: str = None):
 
     If an argument is passed, it will replace the default commit message.
     '''
+
+    no_remote = False
+
+    # Set up the directory if it doesn't exist yet
+    if not config.repo_path.exists():
+        # If a url is in the config.json then we assume that the repo exists
+        # somewhere
+        # If there's no repo_url set, then we just initialize one and don't
+        # push/pull anything (since there's not a remote yet)
+        if len(config.repo_url) > 0:
+            git.Repo.clone_from(config.repo_url, str(config.repo_path))
+        else:
+            no_remote = True
+            git.Repo.init(config.repo_path)
+
     os.chdir(config.repo_path)
     repo = git.Repo(config.repo_path)
-    origin = repo.remote()
+
+
+    # If the repo has a remote, origin will be set to it
+    if not no_remote:
+        try:
+            origin = repo.remote()
+        except ValueError:
+            no_remote = True
 
     repo_hostname_path = config.repo_path / HOSTNAME
 
     # Pull the git repo before updating anything
-    pull(origin)
+    if not no_remote:
+        pull(origin)
 
     # We remove the previous version so files that are no-longer there are removed
     if os.path.exists(HOSTNAME) and os.path.isdir(HOSTNAME):
@@ -123,13 +150,17 @@ def save(config: Config, message: str = None):
 
     # Add, commit, and push any changes
     add(repo)
-    diff = repo.git.diff('HEAD~', repo_hostname_path).strip()
+    if no_remote:
+        diff = ''
+    else:
+        diff = repo.git.diff('HEAD~', repo_hostname_path).strip()
     if len(diff) > 0:
         if message != None:
             commit(repo, message)
         else:
             commit(repo)
-        push(origin)
+        if not no_remote:
+            push(origin)
 
 
 def install(config: Config):
@@ -191,10 +222,6 @@ def main(argv):
         return
 
     config = load_config()
-
-    # Create the repo directory if it doesn't already exist
-    if not config.repo_path.exists():
-        os.makedirs(config.repo_path)
 
     if len(argv) <= 1:
         save(config)
