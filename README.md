@@ -1,4 +1,4 @@
-# dotman
+# dotboy
 
 A Python script to help with dot file management
 
@@ -8,7 +8,7 @@ GitPython
 
 ### Configuration:
 
-Configuration is done in a json stored in '~/.config/dotman/config.json'
+Configuration is done in a json stored in '~/.config/dotboy/config.json'
 
 An example configuration json is:
 
@@ -39,7 +39,7 @@ An example configuration json is:
         "i3",
         "polybar",
         "picom",
-        "dotman"
+        "dotboy"
       ]
     },
     {

@@ -34,7 +34,7 @@ HOSTNAME = 'host-' + socket.gethostname()
 
 
 def load_config() -> Config:
-    config_json_path = Path.home() / '.config/dotman/config.json'
+    config_json_path = Path.home() / '.config/dotboy/config.json'
     if config_json_path.exists():
         with open(config_json_path) as config_json:
             config_json = config_json.read()
@@ -47,7 +47,7 @@ def load_config() -> Config:
         dirs_to_copy = path.get('dirs_to_copy', [])
         paths.append(PathInfo(path_pair, files_to_copy, dirs_to_copy))
 
-    repo_path = Path.home() / '.dotman'
+    repo_path = Path.home() / '.dotboy'
     if config_json['repo_path']:
         repo_path = Path.expanduser(Path(config_json['repo_path']))
 
