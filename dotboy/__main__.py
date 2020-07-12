@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import argparse
 import datetime
 import json
 import os
@@ -109,7 +110,6 @@ def save(config: Config, message: str = None):
     os.chdir(config.repo_path)
     repo = git.Repo(config.repo_path)
 
-
     # If the repo has a remote, origin will be set to it
     if not no_remote:
         try:
@@ -173,9 +173,10 @@ def install(config: Config):
     for i in range(0, len(host_dir_paths)):
         host_dict[i] = host_dir_paths[i]
 
-    if len(host_dir_paths) > 0:
+    if not len(host_dir_paths) > 0:
         print('You have no saved hosts so there is nothing to install\n'
               'Exiting now...')
+        return
 
     print('Select a host to install from:')
     for index, host in host_dict.items():
@@ -223,17 +224,30 @@ def main(argv):
 
     config = load_config()
 
-    if len(argv) <= 1:
-        save(config)
-    elif argv[1] == 'save':
-        if len(argv) > 2:
-            save(config, argv[2])
-        else:
-            save(config)
-    elif argv[1] == 'install':
+    default_message = 'Update files for ' + \
+        HOSTNAME + ' ' + str(datetime.datetime.now())
+    parser = argparse.ArgumentParser(
+        description='Manage your dot files easily')
+    action = parser.add_mutually_exclusive_group()
+    action.add_argument('-s', '--save', nargs='?', type=str,
+                        const=default_message, metavar='MESSAGE',
+                        help='Save your dot files with an '
+                        'optional commit message. The default message just '
+                        'specifies the time at which the changes were made. '
+                        'This is the default option if neither save nor install'
+                        'are specified.')
+    action.add_argument('-i', '--install', help='Install dot files from your '
+                        'chosen host', action='store_true')
+
+    args = parser.parse_args()
+
+    if args.install:
         install(config)
     else:
-        print(argv[1], ' is not a valid argument for dots.py')
+        if args.save == None:
+            save(config, default_message)
+        else:
+            save(config, args.save)
 
 
 if __name__ == '__main__':
