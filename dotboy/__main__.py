@@ -173,9 +173,10 @@ def install(config: Config):
     for i in range(0, len(host_dir_paths)):
         host_dict[i] = host_dir_paths[i]
 
-    if len(host_dir_paths) > 0:
+    if not len(host_dir_paths) > 0:
         print('You have no saved hosts so there is nothing to install\n'
               'Exiting now...')
+        return
 
     print('Select a host to install from:')
     for index, host in host_dict.items():
