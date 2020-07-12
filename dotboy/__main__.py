@@ -11,8 +11,8 @@ from typing import List
 
 import git
 
-from config import Config
-from path_info import PathInfo
+from .config import Config
+from .path_info import PathInfo
 
 # Set to True to enable 'no git' mode
 # While True, all pulling/committing/pushing to the git repo (by the script)
