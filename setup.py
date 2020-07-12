@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="dotboy",
-    version="0.1.3",
+    version="0.1.4",
     author="Ben Buhse",
     author_email="ben@buhses.com",
     description="A Python script to help with dot file management",
