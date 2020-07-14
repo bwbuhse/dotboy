@@ -77,6 +77,7 @@ An example configuration json is:
 `paths` is a list of json objects, each corresponding to a path where dot files
 are stored on the system. Each object in paths needs two fields with two
 other optional variables.
+
   `installed_path` is the path to the installed location of the dot_files. This field is required for each element in paths.
 
   `repo_path` is the path that you want the files stored within each host-folder
