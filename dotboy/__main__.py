@@ -69,8 +69,7 @@ def add(repo: git.Repo):
 
 def commit(repo: git.Repo, message: str):
     if not NO_GIT:
-        repo.index.commit('Update files for ' + HOSTNAME +
-                          ' ' + str(datetime.datetime.now()))
+        repo.index.commit(message)
 
 
 def save(config: Config, message: str = None):
