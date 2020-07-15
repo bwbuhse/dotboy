@@ -26,13 +26,15 @@ NO_GIT = False
 HOSTNAME = 'host-' + socket.gethostname()
 
 
-def load_config() -> Config:
+def load_config(config_json_path=Path.home() / '.config/dotboy/config.json') -> Config:
     ''' Load dotboy's config.json (if it exists) '''
-    config_json_path = Path.home() / '.config/dotboy/config.json'
     if config_json_path.exists():
         with open(config_json_path) as config_json:
             config_json = config_json.read()
             config_json = json.loads(config_json)
+    else:
+        print(f"{str(config_json_path)} doesn't exist.\nExiting now...")
+        exit(1)
 
     paths: List[PathInfo] = []
     for path in config_json['paths']:
@@ -164,7 +166,7 @@ def install(config: Config, host: str = None):
     if not len(host_dir_paths) > 0:
         print('You have no saved hosts so there is nothing to install\n'
               'Exiting now...')
-        return
+        exit(1)
 
     hosts = [host.name[host.name.find('-') + 1:] for index, host in
              host_dict.items()]
@@ -174,8 +176,8 @@ def install(config: Config, host: str = None):
             selected_host_path = host_dict[host]
         else:
             print(f"Host {host} is not available to install from (it's not saved "
-                  "in the repo right now).")
-            return
+                  "in the repo right now).\nExiting now...")
+            exit(1)
     else:
         print('Select a host to install from:')
         for i in range(0, len(hosts)):
@@ -184,10 +186,12 @@ def install(config: Config, host: str = None):
         selected_host = int(input('\n'))
         if selected_host not in host_dict:
             print(f'{selected_host} is not a valid host option.\n'
-                  f'Exiting now...')
+                  'Exiting now...')
+            exit(1)
 
         selected_host_path = host_dict[selected_host]
 
+    # We don't need to do this if we have NO_GIT enabled
     if NO_GIT:
         return
 
@@ -218,8 +222,6 @@ def main():
         print('Any changes to dot files will not be commited or pushed to the '
               'git repo\n')
 
-    config = load_config()
-
     # Set-up and parse arguments to dotboy
     default_message = 'Update files for ' + \
         HOSTNAME + ' ' + str(datetime.datetime.now())
@@ -237,8 +239,15 @@ def main():
                         metavar='HOST', help='Install dot files from your '
                         'chosen host. If a host is not specified, dotboy will '
                         'ask you to choose a host from all options.')
+    parser.add_argument('-c', '--config', type=str, help='Specify a config.json'
+                        ' for dotboy to use.')
 
     args = parser.parse_args()
+
+    if args.config == None:
+        config = load_config()
+    else:
+        config = load_config(Path(args.config))
 
     if args.install != None:
         if len(args.install) > 0:
