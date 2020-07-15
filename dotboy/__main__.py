@@ -22,14 +22,6 @@ from .path_info import PathInfo
 #   script is run
 NO_GIT = False
 
-# Set to True while updating this script
-# This variable won't let you run the script without passing a commit message
-#   but still lets you push the changes it copies
-# This can be useful for making sure that the code still works but with a
-#   useful commit message about the changes
-EDITING_SCRIPT = False
-
-
 # Used to create the directory for the current HOST
 HOSTNAME = 'host-' + socket.gethostname()
 
@@ -74,13 +66,10 @@ def add(repo: git.Repo):
         repo.git.add('-A')
 
 
-def commit(repo: git.Repo, message: str = None):
+def commit(repo: git.Repo, message: str):
     if not NO_GIT:
-        if message != None:
-            repo.index.commit(message)
-        else:
-            repo.index.commit('Update files for ' + HOSTNAME +
-                              ' ' + str(datetime.datetime.now()))
+        repo.index.commit('Update files for ' + HOSTNAME +
+                          ' ' + str(datetime.datetime.now()))
 
 
 def save(config: Config, message: str = None):
@@ -149,16 +138,15 @@ def save(config: Config, message: str = None):
                             repo_path / file_to_copy)
 
     # Add, commit, and push any changes
-    add(repo)
-    if no_remote:
-        diff = ''
-    else:
-        diff = repo.git.diff('HEAD~', repo_hostname_path).strip()
-    if len(diff) > 0:
-        if message != None:
-            commit(repo, message)
-        else:
-            commit(repo)
+    changed_files = []
+    if not no_remote:
+        changed_files = [item.a_path for item in repo.index.diff(None)]
+    if len(changed_files) > 0:
+        message += '\n\nFiles: '
+        for file in changed_files:
+            message += f'\n  * {file}'
+        add(repo)
+        commit(repo, message)
         if not no_remote:
             push(origin)
 
@@ -211,19 +199,15 @@ def install(config: Config):
                             installed_path / file_to_copy)
 
 
-def main(argv):
+def main():
     if NO_GIT:
         print('Running in NO_GIT mode')
         print('Any changes to dot files will not be commited or pushed to the '
               'git repo\n')
-    elif EDITING_SCRIPT and len(argv) < 3:
-        print('Please enter a commit message as an argument while using '
-              'EDITING_SCRIPT mode')
-        print('Exiting now...')
-        return
 
     config = load_config()
 
+    # Set-up and parse arguments to dotboy
     default_message = 'Update files for ' + \
         HOSTNAME + ' ' + str(datetime.datetime.now())
     parser = argparse.ArgumentParser(
@@ -251,4 +235,4 @@ def main(argv):
 
 
 if __name__ == '__main__':
-    main(sys.argv)
+    main()
