@@ -26,13 +26,15 @@ NO_GIT = False
 HOSTNAME = 'host-' + socket.gethostname()
 
 
-def load_config() -> Config:
+def load_config(config_json_path=Path.home() / '.config/dotboy/config.json') -> Config:
     ''' Load dotboy's config.json (if it exists) '''
-    config_json_path = Path.home() / '.config/dotboy/config.json'
     if config_json_path.exists():
         with open(config_json_path) as config_json:
             config_json = config_json.read()
             config_json = json.loads(config_json)
+    else:
+        print(f"{str(config_json_path)} doesn't exist.\nExiting now...")
+        exit(1)
 
     paths: List[PathInfo] = []
     for path in config_json['paths']:
@@ -150,7 +152,7 @@ def save(config: Config, message: str = None):
             push(origin)
 
 
-def install(config: Config):
+def install(config: Config, host: str = None):
     '''
     Install dot-files from a specified host
     '''
@@ -159,23 +161,39 @@ def install(config: Config):
     host_dict = {}
     for i in range(0, len(host_dir_paths)):
         host_dict[i] = host_dir_paths[i]
+    selected_host_path = ''
 
     if not len(host_dir_paths) > 0:
         print('You have no saved hosts so there is nothing to install\n'
               'Exiting now...')
+        exit(1)
+
+    hosts = [host.name[host.name.find('-') + 1:] for index, host in
+             host_dict.items()]
+
+    if host != None:
+        if host in hosts:
+            selected_host_path = host_dict[host]
+        else:
+            print(f"Host {host} is not available to install from (it's not saved "
+                  "in the repo right now).\nExiting now...")
+            exit(1)
+    else:
+        print('Select a host to install from:')
+        for i in range(0, len(hosts)):
+            print(f'[{i}] - {hosts[i]}')
+
+        selected_host = int(input('\n'))
+        if selected_host not in host_dict:
+            print(f'{selected_host} is not a valid host option.\n'
+                  'Exiting now...')
+            exit(1)
+
+        selected_host_path = host_dict[selected_host]
+
+    # We don't need to do this if we have NO_GIT enabled
+    if NO_GIT:
         return
-
-    print('Select a host to install from:')
-    for index, host in host_dict.items():
-        host = host.name[host.name.find('-') + 1:]
-        print(f'[{index}] - {host}')
-
-    selected_host = int(input('\n'))
-    if selected_host not in host_dict:
-        print(f'{selected_host} is not a valid host option.\n'
-              f'Exiting now...')
-
-    selected_host_path = host_dict[selected_host]
 
     # Copy files/dirs from the repo to their installed locations
     for path in config.path_infos:
@@ -204,13 +222,11 @@ def main():
         print('Any changes to dot files will not be commited or pushed to the '
               'git repo\n')
 
-    config = load_config()
-
     # Set-up and parse arguments to dotboy
     default_message = 'Update files for ' + \
         HOSTNAME + ' ' + str(datetime.datetime.now())
-    parser = argparse.ArgumentParser(
-        description='Manage your dot files easily')
+    parser = argparse.ArgumentParser(prog='python -m dotboy',
+                                     description='Manage your dot files easily')
     action = parser.add_mutually_exclusive_group()
     action.add_argument('-s', '--save', nargs='?', type=str,
                         const=default_message, metavar='MESSAGE',
@@ -219,13 +235,25 @@ def main():
                         'specifies the time at which the changes were made. '
                         'This is the default option if neither save nor install'
                         'are specified.')
-    action.add_argument('-i', '--install', help='Install dot files from your '
-                        'chosen host', action='store_true')
+    action.add_argument('-i', '--install', nargs='?', type=str, const='',
+                        metavar='HOST', help='Install dot files from your '
+                        'chosen host. If a host is not specified, dotboy will '
+                        'ask you to choose a host from all options.')
+    parser.add_argument('-c', '--config', type=str, help='Specify a config.json'
+                        ' for dotboy to use.')
 
     args = parser.parse_args()
 
-    if args.install:
-        install(config)
+    if args.config == None:
+        config = load_config()
+    else:
+        config = load_config(Path(args.config))
+
+    if args.install != None:
+        if len(args.install) > 0:
+            install(config, args.install)
+        else:
+            install(config)
     else:
         if args.save == None:
             save(config, default_message)
