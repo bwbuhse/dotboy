@@ -27,6 +27,7 @@ HOSTNAME = 'host-' + socket.gethostname()
 
 
 def load_config() -> Config:
+    ''' Load dotboy's config.json (if it exists) '''
     config_json_path = Path.home() / '.config/dotboy/config.json'
     if config_json_path.exists():
         with open(config_json_path) as config_json:
@@ -83,7 +84,6 @@ def save(config: Config, message: str = None):
     '''
 
     no_remote = False
-
     # Set up the directory if it doesn't exist yet
     if not config.repo_path.exists():
         # If a url is in the config.json then we assume that the repo exists
