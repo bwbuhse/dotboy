@@ -32,6 +32,7 @@ Configuration is done in a json stored in '~/.config/dotboy/config.json'
 An example configuration json is:
 ```
 {
+  "repo_url": "https://gitlab.com/bwbuhse/dotboy",
   "repo_path": "~/projects/dot-files",
   "paths": [
     {
@@ -72,7 +73,9 @@ An example configuration json is:
 }
 ```
 
-`repo_path` is the path to the repository that you want to store the dot files in or where the repository already exists. This field is required.
+`repo_url` is the url to your dot file repository. This field is optional. If the repository path exists on the local machine, then this field is ignored. Otherwise, if the path doesn't yet exist, dotboy will clone the repo at this URL to the `repo_path` location.
+
+`repo_path` is the path to the repository that you want to store the dot files in or where the repository already exists. This field is optional. If a path is supplied, the repository will be there, if not then the default path of `~/.dotboy` will be used.
 
 `paths` is a list of json objects, each corresponding to a path where dot files
 are stored on the system. Each object in paths needs two fields with two
