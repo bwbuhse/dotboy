@@ -3,27 +3,12 @@
 import argparse
 import datetime
 import json
-import os
-import shutil
 import socket
-import sys
 from pathlib import Path
-from typing import List
-
-import git
 
 from .config import Config
 from .path_info import PathInfo
-
-# Set to True to enable 'no git' mode
-# While True, all pulling/committing/pushing to the git repo (by the script)
-#   is disabled
-# Used for updated this script without committing changes everytime that the
-#   script is run
-NO_GIT = False
-
-# Used to create the directory for the current HOST
-HOSTNAME = 'host-' + socket.gethostname()
+from .dotboy import DotBoy
 
 
 def load_config(config_json_path=Path.home() / '.config/dotboy/config.json') -> Config:
@@ -54,177 +39,12 @@ def load_config(config_json_path=Path.home() / '.config/dotboy/config.json') -> 
     return Config(repo_path, repo_url, paths)
 
 
-def pull(origin: git.Remote):
-    if not NO_GIT:
-        origin.pull()
-
-
-def push(origin: git.Remote):
-    if not NO_GIT:
-        origin.push()
-
-
-def add(repo: git.Repo):
-    if not NO_GIT:
-        repo.git.add('-A')
-
-
-def commit(repo: git.Repo, message: str):
-    if not NO_GIT:
-        repo.index.commit(message)
-
-
-def save(config: Config, message: str = None):
-    '''
-    Pulls any changes from the git repo.
-    Deletes the directory in the repo for the current host then re-creates it.
-    Copies all specified files to the directory for the host.
-    Adds, commits, then pushes all the changes.
-
-    If an argument is passed, it will replace the default commit message.
-    '''
-
-    no_remote = False
-    # Set up the directory if it doesn't exist yet
-    if not config.repo_path.exists():
-        # If a url is in the config.json then we assume that the repo exists
-        # somewhere
-        # If there's no repo_url set, then we just initialize one and don't
-        # push/pull anything (since there's not a remote yet)
-        if len(config.repo_url) > 0:
-            git.Repo.clone_from(config.repo_url, str(config.repo_path))
-        else:
-            no_remote = True
-            git.Repo.init(config.repo_path)
-
-    os.chdir(config.repo_path)
-    repo = git.Repo(config.repo_path)
-
-    # If the repo has a remote, origin will be set to it
-    if not no_remote:
-        try:
-            origin = repo.remote()
-        except ValueError:
-            no_remote = True
-
-    repo_hostname_path = config.repo_path / HOSTNAME
-
-    # Pull the git repo before updating anything
-    if not no_remote:
-        pull(origin)
-
-    # We remove the previous version so files that are no-longer there are removed
-    if os.path.exists(HOSTNAME) and os.path.isdir(HOSTNAME):
-        shutil.rmtree(HOSTNAME)
-    repo_hostname_path.mkdir()
-
-    # Copy files/dirs from their original locations into the repo
-    for path in config.path_infos:
-        installed_path = Path.expanduser(Path(path.path_pair[0]))
-        repo_path = repo_hostname_path / path.path_pair[1]
-        os.makedirs(repo_path, exist_ok=True)
-
-        for dir_to_copy in path.dirs_to_copy:
-            if (installed_path / dir_to_copy).exists():
-                shutil.copytree(installed_path / dir_to_copy,
-                                repo_path / dir_to_copy)
-
-        for file_to_copy in path.files_to_copy:
-            if '/' in file_to_copy:
-                # We need to create any directories that don't exist already
-                inner_dirs = file_to_copy[0:file_to_copy.rfind('/')]
-                os.makedirs(repo_path / inner_dirs, exist_ok=True)
-            if (installed_path / file_to_copy).exists():
-                shutil.copy(installed_path / file_to_copy,
-                            repo_path / file_to_copy)
-
-    # Add, commit, and push any changes
-    changed_files = []
-    if not no_remote:
-        changed_files = [item.a_path for item in repo.index.diff(None)]
-    if len(changed_files) > 0:
-        message += '\n\nFiles: '
-        for file in changed_files:
-            message += f'\n  * {file}'
-        add(repo)
-        commit(repo, message)
-        if not no_remote:
-            push(origin)
-
-
-def install(config: Config, host: str = None):
-    '''
-    Install dot-files from a specified host
-    '''
-    host_dir_paths = [x for x in config.repo_path.iterdir(
-    ) if x.is_dir() and x.name.startswith('host')]
-    host_dict = {}
-    for i in range(0, len(host_dir_paths)):
-        host_dict[i] = host_dir_paths[i]
-    selected_host_path = ''
-
-    if not len(host_dir_paths) > 0:
-        print('You have no saved hosts so there is nothing to install\n'
-              'Exiting now...')
-        exit(1)
-
-    hosts = [host.name[host.name.find('-') + 1:] for index, host in
-             host_dict.items()]
-
-    if host != None:
-        if host in hosts:
-            selected_host_path = host_dict[host]
-        else:
-            print(f"Host {host} is not available to install from (it's not saved "
-                  "in the repo right now).\nExiting now...")
-            exit(1)
-    else:
-        print('Select a host to install from:')
-        for i in range(0, len(hosts)):
-            print(f'[{i}] - {hosts[i]}')
-
-        selected_host = int(input('\n'))
-        if selected_host not in host_dict:
-            print(f'{selected_host} is not a valid host option.\n'
-                  'Exiting now...')
-            exit(1)
-
-        selected_host_path = host_dict[selected_host]
-
-    # We don't need to do this if we have NO_GIT enabled
-    if NO_GIT:
-        return
-
-    # Copy files/dirs from the repo to their installed locations
-    for path in config.path_infos:
-        installed_path = Path.expanduser(Path(path.path_pair[0]))
-        repo_path = selected_host_path / path.path_pair[1]
-
-        for dir_to_copy in path.dirs_to_copy:
-            if (selected_host_path / dir_to_copy).exists():
-                shutil.copytree(installed_path / dir_to_copy,
-                                repo_path / dir_to_copy,
-                                dirs_exist_ok=True)
-
-        for file_to_copy in path.files_to_copy:
-            if '/' in file_to_copy:
-                # We need to create any directories that don't exist already
-                inner_dirs = file_to_copy[0:file_to_copy.rfind('/')]
-                os.makedirs(installed_path / inner_dirs, exist_ok=True)
-            if (selected_host_path / file_to_copy).exists():
-                shutil.copy(selected_host_path / file_to_copy,
-                            installed_path / file_to_copy)
-
-
 def main():
-    if NO_GIT:
-        print('Running in NO_GIT mode')
-        print('Any changes to dot files will not be commited or pushed to the '
-              'git repo\n')
+    hostname = 'host-' + socket.gethostname()
 
     # Set-up and parse arguments to dotboy
-    default_message = 'Update files for ' + \
-        HOSTNAME + ' ' + str(datetime.datetime.now())
+    default_message = f'Update files for {hostname} at ' \
+        f'{str(datetime.datetime.now())}'
     parser = argparse.ArgumentParser(prog='python -m dotboy',
                                      description='Manage your dot files easily')
     action = parser.add_mutually_exclusive_group()
@@ -241,6 +61,9 @@ def main():
                         'ask you to choose a host from all options.')
     parser.add_argument('-c', '--config', type=str, help='Specify a config.json'
                         ' for dotboy to use.')
+    parser.add_argument('-G', '--no-git', help="Disable git. Files will still be copied but"
+                        " any git actions in the repository won't happen.",
+                        action='store_false')
 
     args = parser.parse_args()
 
@@ -249,16 +72,18 @@ def main():
     else:
         config = load_config(Path(args.config))
 
+    db = DotBoy(config, hostname, args.no_git)
+
     if args.install != None:
         if len(args.install) > 0:
-            install(config, args.install)
+            db.install(config, args.install)
         else:
-            install(config)
+            db.install(config)
     else:
         if args.save == None:
-            save(config, default_message)
+            db.save(config, default_message)
         else:
-            save(config, args.save)
+            db.save(config, args.save)
 
 
 if __name__ == '__main__':
