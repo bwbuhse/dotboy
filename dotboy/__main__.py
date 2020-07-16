@@ -64,6 +64,8 @@ def main():
     parser.add_argument('-G', '--no-git', help="Disable git. Files will still be copied but"
                         " any git actions in the repository won't happen.",
                         action='store_false')
+    parser.add_argument('-v', '--verbose', help="Enable verbose output.",
+                        action='store_true')
 
     args = parser.parse_args()
 
@@ -72,7 +74,7 @@ def main():
     else:
         config = load_config(Path(args.config))
 
-    db = DotBoy(config, hostname, args.no_git)
+    db = DotBoy(config, hostname, args.no_git, args.verbose)
 
     if args.install != None:
         if len(args.install) > 0:
