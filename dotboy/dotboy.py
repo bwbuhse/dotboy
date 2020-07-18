@@ -1,8 +1,8 @@
 import os
 import shutil
 import sys
-from typing import List
 from pathlib import Path
+from typing import Set
 
 import git
 
@@ -42,6 +42,11 @@ class DotBoy():
             if self.verbose:
                 print('Pushing changes to the dot file repository')
             repo.index.commit(message)
+
+    def _get_files(self) -> Set[str]:
+        ''' Gets a list of all files in the previous revision of the host '''
+        return {os.path.join(dp, f) for dp, dn, filenames in
+                os.walk(self.hostname) for f in filenames}
 
     def save(self, config: Config, message: str = None):
         '''
@@ -87,7 +92,9 @@ class DotBoy():
             self._pull(origin)
 
         # We remove the previous version so files that are no-longer there are removed
+        old_files = []
         if os.path.exists(self.hostname) and os.path.isdir(self.hostname):
+            old_files = self._get_files()
             if self.verbose:
                 print(f"Deleting old version of {self.hostname}'s dot files")
             shutil.rmtree(self.hostname)
@@ -118,12 +125,19 @@ class DotBoy():
 
         # Add, commit, and push any changes
         changed_files = []
+        cur_files = self._get_files()
+        added_files = cur_files - old_files
         if not no_remote:
             changed_files = [item.a_path for item in repo.index.diff(None)]
-        if len(changed_files) > 0:
+        if len(changed_files) > 0 or len(added_files) > 0:
             message += '\n\nFiles: '
             for file in changed_files:
-                message += f'\n  * {file}'
+                if file not in cur_files:
+                    message += f'\n  - {file}'
+                else:
+                    message += f'\n  * {file}'
+            for file in added_files:
+                message += f'\n  + {file}'
             self._add(repo)
             self._commit(repo, message)
             if not no_remote:
